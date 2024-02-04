@@ -1,0 +1,13 @@
+{
+  "identity":{
+    "name":"TWITCH_NAME",
+    "oauth":"OAUTH:STRING"
+  },
+  "channel":"#MODERATED_CHANNEL",
+  "youtube":{
+    "api_key":"GOOGLE_API_KEY_FOR_YT"
+  },
+  "ui_port":4444,
+  "overlay_port":3333,
+  "announces":["Nice weather", "Innit"]
+}
