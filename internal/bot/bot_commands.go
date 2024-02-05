@@ -81,8 +81,13 @@ func (b *Bot) addMusicCommand(channel, username, data string, isMod, elfed bool)
 	b.replyElfed(channel, username, msg, elfed)
 }
 
-func (b *Bot) skipMusicCommand() {
+func (b *Bot) skipMusicCommand(channel, username string, isMod, elfed bool) {
+	if !b.checkPermission(username, isMod, true) {
+		b.replyElfed(channel, username, strNoPermisson, elfed)
+		return
+	}
 
+	b.ytMus.Skip()
 }
 
 func (b *Bot) pointsCommand() {

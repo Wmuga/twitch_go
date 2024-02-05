@@ -35,6 +35,8 @@ type YTMusic struct {
 	queue    []Info
 	loopPlay atomic.Bool
 	canPlay  chan struct{}
+
+	curStream beep.StreamSeekCloser
 }
 
 type idResult struct {
@@ -101,8 +103,6 @@ func New(apiKey, owner string) IMusicPlayer {
 			// check if already playing
 			case <-yt.canPlay:
 				yt.tryPlaying()
-				yt.canPlay <- struct{}{}
-
 			default:
 				time.Sleep(time.Second * 5)
 			}
@@ -167,20 +167,22 @@ func (yt *YTMusic) Play() {
 	yt.loopPlay.Store(true)
 }
 
-func (*YTMusic) Skip() {
-	panic("unimplemented")
+func (yt *YTMusic) Skip() {
+	if !yt.isPlaying() {
+		return
+	}
+	speaker.Close()
+	speaker.Clear()
+	yt.callback()
 }
 
 func (yt *YTMusic) Stop() {
 	yt.loopPlay.Store(false)
+	yt.Skip()
 }
 
 func (yt *YTMusic) isPlaying() bool {
 	return yt.Ready() && yt.current != InfoEmpty
-}
-
-func (yt *YTMusic) startPlay(id string) {
-
 }
 
 func (*YTMusic) getLength(lenStr string) int64 {
@@ -306,21 +308,21 @@ func (yt *YTMusic) tryPlaying() {
 	}
 	// get item from queue
 	item := yt.queue[0]
-	yt.current = item
 	yt.queue = yt.queue[1:]
-	defer func() {
-		yt.current = InfoEmpty
-	}()
 
 	buf, err := downloadMusic(item)
 	if err != nil {
 		yt.eLogger.Println(err)
+		yt.canPlay <- struct{}{}
+		yt.current = InfoEmpty
 		return
 	}
 
 	resultBuffer, err := convertToMp3(buf)
 	if err != nil {
 		yt.eLogger.Println(err)
+		yt.canPlay <- struct{}{}
+		yt.current = InfoEmpty
 		return
 	}
 
@@ -328,14 +330,17 @@ func (yt *YTMusic) tryPlaying() {
 	stream, format, err := mp3.Decode(io.NopCloser(reader))
 	if err != nil {
 		yt.eLogger.Println(err)
+		yt.canPlay <- struct{}{}
+		yt.current = InfoEmpty
 		return
 	}
 
+	yt.curStream = stream
+	yt.current = item
+
 	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
 	speaker.Play(beep.Seq(stream,
-		beep.Callback(func() {
-			stream.Close() // nolint:errcheck
-		})))
+		beep.Callback(yt.callback)))
 }
 
 func downloadMusic(item Info) ([]byte, error) {
@@ -402,4 +407,11 @@ func convertToMp3(buf []byte) (*bytes.Buffer, error) {
 	}
 
 	return resultBuffer, nil
+}
+
+func (yt *YTMusic) callback() {
+	fmt.Println("Callback")
+	yt.canPlay <- struct{}{}
+	yt.current = InfoEmpty
+	yt.curStream.Close() // nolint:errcheck
 }

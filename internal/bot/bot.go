@@ -166,6 +166,8 @@ func (b *Bot) HandleCommand(channel, sender, command string, args []string, isMo
 		fallthrough
 	case "sr-stop":
 		b.stopMusicCommand(channel, sender, isMod, elfed)
+	case "sr-skip":
+		b.skipMusicCommand(channel, sender, isMod, elfed)
 	case "sr":
 		b.addMusicCommand(channel, sender, strings.Join(args, " "), isMod, elfed)
 	}
