@@ -11,6 +11,8 @@ import (
 	"github.com/wmuga/twitch_go/internal/database"
 	"github.com/wmuga/twitch_go/internal/deelfer"
 	"github.com/wmuga/twitch_go/internal/music"
+	"github.com/wmuga/twitch_go/internal/ui"
+	"github.com/wmuga/twitch_go/internal/ui/web"
 	"golang.org/x/exp/maps"
 )
 
@@ -23,6 +25,7 @@ type Bot struct {
 	deelfer     *deelfer.Deelfer
 	ytMus       music.IMusicPlayer
 	srOwnerOnly bool
+	uis         []ui.UI
 }
 
 func New(opt *BotOptions, wg *sync.WaitGroup) *Bot {
@@ -35,8 +38,8 @@ func New(opt *BotOptions, wg *sync.WaitGroup) *Bot {
 		deelfer: deelfer.New(),
 		db:      database.New(),
 		ytMus:   music.New(opt.Youtube.APIKey, opt.Channel[1:]),
+		uis:     []ui.UI{web.New(opt.UIPort)},
 	}
-
 	wg.Add(1)
 	// messages
 	go func() {
@@ -58,6 +61,7 @@ func New(opt *BotOptions, wg *sync.WaitGroup) *Bot {
 		}
 	}()
 
+	b.setupUIs()
 	b.Join(opt.Channel)
 
 	fmt.Println("Bot ready")
@@ -172,6 +176,36 @@ func (b *Bot) HandleCommand(channel, sender, command string, args []string, isMo
 		b.addMusicCommand(channel, sender, strings.Join(args, " "), isMod, elfed)
 	}
 
+}
+
+func (b *Bot) setupUIs() {
+	owner := b.options.Channel[1:]
+	for _, ui := range b.uis {
+		ui.OnSend(func(channel, message string) {
+			b.SendMessage(channel, message)
+		})
+
+		ui.OnSendSelf(func(message string) {
+			b.SendMessage(b.options.Channel, message)
+		})
+
+		ui.OnCommand(func(cmd string) {
+			data := strings.Split(cmd, " ")
+			b.HandleCommand(b.options.Channel, owner, data[0][1:], data[1:], false, false)
+		})
+
+		ui.OnDBGet(func() {
+			ui.SendString("Not implemented")
+		})
+
+		ui.OnDBUpdate(func(usr string, pts int64) {
+			ui.SendString("Not implemented")
+		})
+
+		ui.OnResize(func(big bool) {
+			ui.SendString("Not implemented")
+		})
+	}
 }
 
 func checkChannel(channel string) string {

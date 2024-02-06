@@ -5,6 +5,7 @@ go 1.21.6
 require github.com/sunspots/tmi v0.0.0-20180618222319-19fdab624b83
 
 require (
+	github.com/gorilla/mux v1.8.1
 	github.com/mattn/go-sqlite3 v1.14.21
 	github.com/wader/goutubedl v0.0.0-20240113171134-01bac34c4c02
 	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a

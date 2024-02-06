@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>UI</title>
+</head>
+<body>
+  <table>
+    <tr class="headers">
+      <th colspan="2">Музыка</th>
+      <th>Информационное</th>
+      <th>Кнопки</th>
+      <th colspan="2">Поля</th>
+    </tr>
+    <tr>
+      <td>Исполнитель</td>
+      <td id="artist"></td>
+      <td rowspan="6" id="infocol"></td>
+      <td>
+        <input type="button" id="top20" name="top20" onclick="sendTop20()" value="Получить топ по поинтам" >
+      </td>
+    </tr>
+    <tr>
+      <td>Название</td>
+      <td id="title"></td>
+      <td>
+        <input type="button" id="sendMsg" name="sendMsg" onclick="sendMessage()" value="Отправить сообщение">
+      </td>
+      <td>
+        <input type="text" id="channelName" name="channelName" value="wmuga" placeholder="Канал">
+      </td>
+      <td>
+        <input type="text" id="msgText" name="msgText" placeholder="Сообщение">
+      </td>
+    </tr>
+    <tr>
+      <td>Заказал</td>
+      <td id="requester"></td>
+      <td>
+        <input type="button" id="setPointsUser" name="setPointsUser" onclick="setPointsUser()" value="Обновить поинты пользователя" >
+      </td>
+      <td>
+        <input type="text" id="userName" name="userName" placeholder="Пользователь" >
+      </td>
+      <td>
+        <input type="text" id="pointsCount" name="pointsCount" placeholder="Поинты" >
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <input type="button" id="srStart" name="srStart" onclick="startMusic()" value="Включить музыку всем">
+      </td>
+      <td>
+        <input type="button" id="srStop" name="srStop" onclick="stopMusic()" value="Выключить музыку">
+      </td>
+      <td>
+        <input type="button" id="sendCmd" name="sendCmd" onclick="sendCommand()" value="Отправить как команду">
+      </td>
+      <td colspan="2">
+        <input type="text" id="cmd" name="cmd" placeholder="!команда">
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <input type="button" id="sr" name="sr" onclick="sendMusic()" value="Заказать музыку">
+      </td>
+      <td>
+        <input type="text" id="musicTitle" name="musicTitle" placeholder="Название">
+      </td>
+      <td>
+        <input type="button" id="resize" name="resize" onclick="sendResize()" value="Изменить размер чата">
+      </td>
+      <td>
+        <input type="text" id="size" name="size" placeholder="Узкий?">
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <input type="button" id="srStartMe" name="srStartMe" onclick="startMusicMe()" value="Включить музыку мне">
+      </td>
+      <td>
+        <input type="button" id="srSkip" name="srSkip" onclick="skipMusic()" value="Скипнуть музыку">
+      </td>
+    </tr>
+  </table>
+<script>
+  let socket = new EventSource("/sse")
+
+  function init(){
+    console.log('connected');
+    socket.addEventListener('music',(mistr)=>{
+      let mi = JSON.parse(mistr)
+      setMusic(mi?.artist,mi?.track,mi?.username);
+    })
+
+    socket.addEventListener('str',(str)=>{
+      addText(str);
+    });
+  }
+
+  function setMusic(artist, title, requester){
+    document.getElementById('artist').innerText = artist??"";
+    document.getElementById('title').innerText = title??"";
+    document.getElementById('requester').innerText = requester??"";
+  }
+
+  function getArgs(field1, field2, reset1, reset2){
+    let arg0 = document.getElementById(field1)?.value??""
+    let arg1 = document.getElementById(field2)?.value??""
+    if (reset1) document.getElementById(field1).value = ""
+    if (reset2) document.getElementById(field2).value = ""
+    return {
+      arg0,
+      arg1,
+    }
+  }
+
+  function addText(text){
+    document.getElementById('infocol').innerText += `${text}\n`
+  }
+
+  function sendTop20(){
+    fetch("/dbget",{method:"POST"})
+  }
+
+  function sendMessage(){
+    let {arg0, arg1} = getArgs('channelName','msgText',false,true);
+    if (arg0?.length == 0 || arg1?.length == 0) {
+      addText('Неверные переменные');
+      return;
+    }
+    arg0 = encodeURI(arg0)
+    arg1 = encodeURI(arg1)
+    fetch(`/send?chan=${arg0}&msg=${arg1}`,{method:"POST"})
+  }
+
+  function updatePoints(){
+    let {arg0, arg1} = getArgs('userName','pointsCount',true,true);
+    arg1 = parseInt(arg1)
+    if (arg0?.length == 0 || isNaN(arg1)) {
+      addText('Неверные переменные');
+      return;
+    }
+    arg0 = encodeURI(arg0)
+    arg1 = encodeURI(arg1)
+    fetch(`/dbupdate?usr=${arg0}&pts=${arg1}`,{method:"POST"})
+  }
+
+  function sendCommand(){
+    let {arg0, arg1} = getArgs('cmd','cmd',true,true);
+    if (arg0?.length == 0) {
+      addText('Неверные переменные');
+      return;
+    }
+    if (arg0[0]!='!'){
+      arg0 = '!'+arg0
+    }
+    arg0 = encodeURI(arg0)
+    fetch(`/command?cmd=${arg0}`,{method:"POST"})
+  }
+
+  function sendResize(){
+    let {arg0, arg1} = getArgs('size','size',true,true);
+    arg0 = encodeURI(arg0)
+    fetch(`/resize?big=${arg0}`,{method:"POST"})
+  }
+
+  function startMusic(){
+    let arg0 = encodeURI("!sr-start")
+    fetch(`/command?cmd=${arg0}`,{method:"POST"})
+  }
+
+  function startMusicMe(){
+    let arg0 = encodeURI("!sr-start me")
+    fetch(`/command?cmd=${arg0}`,{method:"POST"})
+  }
+
+  function stopMusic(){
+    let arg0 = encodeURI("!sr-stop me")
+    fetch(`/command?cmd=${arg0}`,{method:"POST"})
+  }
+
+  function skipMusic(){
+    let arg0 = encodeURI("!sr-skip")
+    fetch(`/command?cmd=${arg0}`,{method:"POST"})
+  }
+
+  function sendMusic(){
+    let {arg0, arg1} = getArgs('musicTitle','musicTitle',true,true);
+    if (arg0?.length == 0) {
+      addText('Вставь название');
+      return;
+    }
+    addText('Заказано: ' +arg0);
+    
+    let arg = encodeURI("!sr " +arg0)
+    fetch(`/command?cmd=${arg}`,{method:"POST"})
+  }
+
+  init()
+</script>
+<style>
+  body{
+    position: absolute;
+    width: 100svw;
+    height: 100svh;
+  }
+  .headers > *{
+    text-align: center;
+  }
+  table{
+    position: relative;
+    left: 50%;
+    transform: translate(-50%,0);
+  }
+  td, th{
+    width: 10em;
+    height: 4em;
+    padding: 1em;
+  }
+  td#infocol{
+    border: 1px solid black;
+  }
+  #infocol{
+    width: 18em;
+  }
+</style>
+</body>
+</html>
