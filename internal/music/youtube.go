@@ -402,7 +402,6 @@ func convertToMp3(buf []byte) (*bytes.Buffer, error) {
 }
 
 func (yt *YTMusic) callback() {
-	fmt.Println("Callback")
 	yt.canPlay <- struct{}{}
 	yt.current = InfoEmpty
 	yt.curStream.Close() // nolint:errcheck
