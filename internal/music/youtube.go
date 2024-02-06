@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -21,6 +20,7 @@ import (
 	"github.com/faiface/beep/mp3"
 	"github.com/faiface/beep/speaker"
 	ytdl "github.com/wader/goutubedl"
+	"github.com/wmuga/twitch_go/internal/tools"
 )
 
 type YTMusic struct {
@@ -195,17 +195,17 @@ func (*YTMusic) getLength(lenStr string) int64 {
 	// hours
 	data := strings.Split(lenStr, "H")
 	if len(data) == 2 {
-		length += noErrConv(data[0]) * 3600
+		length += tools.NoErrConv(data[0]) * 3600
 	}
 
 	// minutes
 	data = strings.Split(data[len(data)-1], "M")
 	if len(data) == 2 {
-		length += noErrConv(data[0]) * 60
+		length += tools.NoErrConv(data[0]) * 60
 	}
 
 	data = strings.Split(data[len(data)-1], "S")
-	length += noErrConv(data[0])
+	length += tools.NoErrConv(data[0])
 
 	return length
 }
@@ -290,14 +290,6 @@ func (yt *YTMusic) getVideoInfo(id string) Info {
 		Track:    vid.Snippet.Title,
 		Duration: yt.getLength(vid.Details.Duration),
 	}
-}
-
-func noErrConv(s string) int64 {
-	n, e := strconv.ParseInt(s, 10, 64)
-	if e != nil {
-		return 0
-	}
-	return n
 }
 
 func (yt *YTMusic) tryPlaying() {
