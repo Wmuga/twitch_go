@@ -119,7 +119,7 @@ func (yt *YTMusic) Add(username string, isMod bool, search string) string {
 		return strQueueMax
 	}
 
-	info := Info{}
+	var info Info
 
 	if ytReg1.MatchString(search) {
 		id := strings.Split(strings.Split(search, " ")[0], "v=")[1]
@@ -211,11 +211,17 @@ func (*YTMusic) getLength(lenStr string) int64 {
 }
 
 func (yt *YTMusic) isOwner(username string) bool {
-	return strings.ToLower(username) == strings.ToLower(yt.owner)
+	return strings.EqualFold(username, yt.owner)
 }
 
 func (yt *YTMusic) countRequests(username string) int {
-	return 0
+	res := 0
+	for _, r := range yt.queue {
+		if strings.EqualFold(r.Username, username) {
+			res++
+		}
+	}
+	return res
 }
 
 func (yt *YTMusic) search(username, data string) Info {
@@ -327,10 +333,18 @@ func (yt *YTMusic) tryPlaying() {
 		return
 	}
 
+	err = speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
+	if err != nil {
+		yt.eLogger.Println(err)
+		yt.canPlay <- struct{}{}
+		yt.current = InfoEmpty
+		speaker.Close()
+		return
+	}
+
 	yt.curStream = stream
 	yt.current = item
 
-	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
 	speaker.Play(beep.Seq(stream,
 		beep.Callback(yt.callback)))
 }

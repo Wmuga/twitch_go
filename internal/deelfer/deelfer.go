@@ -24,7 +24,7 @@ func New() *Deelfer {
 
 func (d *Deelfer) Translate(msg string) string {
 	var buf bytes.Buffer
-	for _, c := range []rune(msg) {
+	for _, c := range msg {
 		if t, ex := d.dict[c]; ex {
 			buf.WriteRune(t) //nolint:errcheck
 			continue
