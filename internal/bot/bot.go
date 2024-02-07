@@ -12,6 +12,7 @@ import (
 	"github.com/wmuga/twitch_go/internal/deelfer"
 	"github.com/wmuga/twitch_go/internal/music"
 	"github.com/wmuga/twitch_go/internal/ui"
+	"github.com/wmuga/twitch_go/internal/ui/overlay"
 	"github.com/wmuga/twitch_go/internal/ui/web"
 	"golang.org/x/exp/maps"
 )
@@ -20,28 +21,32 @@ type Bot struct {
 	db          database.DBConnection
 	conn        *tmi.Connection
 	joined      map[string]struct{}
+	curViewers  map[string]struct{}
 	viewers     map[string]struct{}
 	options     *BotOptions
 	deelfer     *deelfer.Deelfer
 	ytMus       music.IMusicPlayer
 	srOwnerOnly bool
+	overlay     ui.UI
 	uis         []ui.UI
 }
 
 func NewBot(opt *BotOptions, wg *sync.WaitGroup) *Bot {
 	conn := tmi.Connect(opt.Identity.Name, opt.Identity.Oauth)
 	b := &Bot{
-		conn:    conn,
-		options: opt,
-		joined:  map[string]struct{}{},
-		viewers: map[string]struct{}{},
-		deelfer: deelfer.New(),
-		db:      database.New(),
-		ytMus:   music.New(opt.Youtube.APIKey, opt.Channel[1:]),
-		uis:     []ui.UI{web.NewWebUI(opt.UIPort)},
+		conn:       conn,
+		options:    opt,
+		joined:     map[string]struct{}{},
+		curViewers: map[string]struct{}{},
+		viewers:    map[string]struct{}{},
+		deelfer:    deelfer.New(),
+		db:         database.New(),
+		ytMus:      music.New(opt.Youtube.APIKey, opt.Channel[1:]),
+		uis:        []ui.UI{web.NewWebUI(opt.UIPort), overlay.NewOverlayUI(opt.OverlayPort)},
 	}
-	wg.Add(1)
+	b.overlay = b.uis[1]
 	// messages
+	wg.Add(1)
 	go func() {
 		for {
 			msg, err := conn.ReadMessage()
@@ -56,7 +61,7 @@ func NewBot(opt *BotOptions, wg *sync.WaitGroup) *Bot {
 	// add points
 	go func() {
 		for {
-			b.db.MassAddPoints(maps.Keys(b.viewers), 1)
+			b.db.MassAddPoints(maps.Keys(b.curViewers), 1)
 			time.Sleep(time.Minute)
 		}
 	}()
@@ -123,12 +128,20 @@ func (b *Bot) HandleMessage(msg *tmi.Message) {
 	}
 
 	if msg.Command == "JOIN" {
+		b.curViewers[msg.From] = struct{}{}
+		if _, ex := b.viewers[msg.From]; ex || msg.From == channel[1:] {
+			return
+		}
 		b.viewers[msg.From] = struct{}{}
+
+		hello := fmt.Sprintf("Привествую, @%s", msg.From)
+		b.overlay.SendString(hello)
+		b.SendMessage(channel, hello)
 		return
 	}
 
 	if msg.Command == "PART" {
-		delete(b.viewers, msg.From)
+		delete(b.curViewers, msg.From)
 		return
 	}
 
