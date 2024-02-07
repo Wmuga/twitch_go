@@ -21,7 +21,7 @@ type overlay struct {
 }
 
 type strBody struct {
-	str string
+	Str string `json:"str"`
 }
 
 func NewOverlayUI(port int) ui.UI {

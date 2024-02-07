@@ -1,12 +1,12 @@
 package music
 
 type Info struct {
-	Album    string
-	Artist   string
-	Track    string
-	Duration int64
-	Username string
-	ID       string
+	Album    string `json:"album"`
+	Artist   string `json:"artist"`
+	Track    string `json:"track"`
+	Duration int64  `json:"duration"`
+	Username string `json:"username"`
+	ID       string `json:"id"`
 }
 
 var InfoEmpty = Info{}
