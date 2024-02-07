@@ -42,7 +42,7 @@ func main() {
 		return
 	}
 	wg := &sync.WaitGroup{}
-	bot.New(opt, wg)
+	bot.NewBot(opt, wg)
 	fmt.Println("Started bot")
 	wg.Wait()
 }

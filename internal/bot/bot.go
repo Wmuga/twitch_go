@@ -28,7 +28,7 @@ type Bot struct {
 	uis         []ui.UI
 }
 
-func New(opt *BotOptions, wg *sync.WaitGroup) *Bot {
+func NewBot(opt *BotOptions, wg *sync.WaitGroup) *Bot {
 	conn := tmi.Connect(opt.Identity.Name, opt.Identity.Oauth)
 	b := &Bot{
 		conn:    conn,
@@ -38,7 +38,7 @@ func New(opt *BotOptions, wg *sync.WaitGroup) *Bot {
 		deelfer: deelfer.New(),
 		db:      database.New(),
 		ytMus:   music.New(opt.Youtube.APIKey, opt.Channel[1:]),
-		uis:     []ui.UI{web.New(opt.UIPort)},
+		uis:     []ui.UI{web.NewWebUI(opt.UIPort)},
 	}
 	wg.Add(1)
 	// messages

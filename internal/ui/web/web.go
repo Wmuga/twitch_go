@@ -29,7 +29,7 @@ type webEvent struct {
 	Data  string
 }
 
-func New(port int) ui.UI {
+func NewWebUI(port int) ui.UI {
 	ev := ui.NewHandler()
 	r := mux.NewRouter()
 
