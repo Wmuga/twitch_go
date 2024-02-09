@@ -30,8 +30,8 @@ func NewOverlayUI(port int) ui.UI {
 		ev,
 		port,
 		log.New(os.Stdout, "[OV ERR]: ", log.LUTC),
-		fmt.Sprintf("http://localhost:%d/mus", port),
-		fmt.Sprintf("http://localhost:%d/str", port),
+		fmt.Sprintf("http://localhost:%d/api/mus", port),
+		fmt.Sprintf("http://localhost:%d/api/str", port),
 	}
 	ev.UI = ovui
 
@@ -44,8 +44,12 @@ func (ov *overlay) SendMusic(music music.Info) {
 		ov.eLog.Println(err)
 		return
 	}
+	req, err := http.NewRequest("POST", ov.musURL, bytes.NewReader(data))
+	if err != nil {
+		ov.eLog.Println(err)
+	}
 
-	_, err = http.Post(ov.musURL, "application/json", bytes.NewReader(data))
+	_, err = http.DefaultClient.Do(req)
 	if err != nil {
 		ov.eLog.Println(err)
 	}
@@ -58,7 +62,11 @@ func (ov *overlay) SendString(str string) {
 		return
 	}
 
-	_, err = http.Post(ov.musURL, "application/json", bytes.NewReader(data))
+	req, err := http.NewRequest("POST", ov.musURL, bytes.NewReader(data))
+	if err != nil {
+		ov.eLog.Println(err)
+	}
+	_, err = http.DefaultClient.Do(req)
 	if err != nil {
 		ov.eLog.Println(err)
 	}

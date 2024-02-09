@@ -67,6 +67,8 @@ func NewBot(opt *BotOptions, wg *sync.WaitGroup) *Bot {
 	}()
 
 	b.setupUIs()
+	b.updateSong()
+
 	b.Join(opt.Channel)
 
 	fmt.Println("Bot ready")
@@ -118,6 +120,10 @@ func (b *Bot) replyElfed(channel, dest, message string, elfed bool) {
 }
 
 func (b *Bot) HandleMessage(msg *tmi.Message) {
+	if msg.From == b.options.Identity.Name {
+		return
+	}
+
 	if len(msg.Params) == 0 {
 		return
 	}
@@ -219,6 +225,23 @@ func (b *Bot) setupUIs() {
 			ui.SendString("Not implemented")
 		})
 	}
+}
+
+func (b *Bot) updateSong() {
+	last := music.InfoEmpty
+	go func() {
+		for {
+			cur := b.ytMus.Current()
+			if cur == last {
+				continue
+			}
+			last = cur
+			for _, ui := range b.uis {
+				ui.SendMusic(last)
+			}
+			time.Sleep(time.Second)
+		}
+	}()
 }
 
 func checkChannel(channel string) string {
