@@ -1,12 +1,73 @@
 package bot
 
-import "strings"
+import (
+	"fmt"
+	"math/rand"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/wmuga/twitch_go/internal/tools"
+)
 
 const (
 	strNoPermisson = "Не трожь кнопку"
-	strSrOwner     = "Включены запросы от стримлера"
-	strSrAll       = "Включены запросы для всех"
+	strWrongArgs   = "Неверный формат команды"
+
+	strSrOwner       = "Включены запросы от стримлера"
+	strSrAll         = "Включены запросы для всех"
+	strSrIsOff       = "Ничего не включено"
+	strSrIsOwnerOnly = "Не для публики"
+
+	strPointsLow    = "Не достаточно поинтов"
+	strPointsFormat = "Твое количество поинтов: %d"
+
+	strRollFormat = "%dd%d: %s = %d"
+
+	strRouletteFail          = "Не повезло. Пока, поинты"
+	strRouletteSuccessFormat = "Опа. Повезло. Держи %d поинтов"
+
+	strCmds = "Команды. В скобочках скоращенные версии: !help !sr !(p)oints !(ro)ulette !(r)oll"
 )
+
+var (
+	rollRegex = regexp.MustCompile(`(\d+) *d *(\d+)`)
+)
+
+// TODO: может переделать под геттеры с "middleware?" и проверки на него повесить
+
+func (b *Bot) HandleCommand(channel, sender, command string, args []string, isMod, elfed bool) {
+	switch command {
+	// Музыка
+	case "sr-start":
+		b.startMusicCommand(channel, sender, strings.Join(args, " "), isMod, elfed)
+	case "sr-end":
+		fallthrough
+	case "sr-close":
+		fallthrough
+	case "sr-stop":
+		b.stopMusicCommand(channel, sender, isMod, elfed)
+	case "sr-skip":
+		b.skipMusicCommand(channel, sender, isMod, elfed)
+	case "sr":
+		b.addMusicCommand(channel, sender, strings.Join(args, " "), isMod, elfed)
+	// Связанное с поинтами
+	case "p":
+		fallthrough
+	case "points":
+		b.pointsCommand(channel, sender, elfed)
+	case "ro":
+		fallthrough
+	case "roulette":
+		b.rouletteCommand(channel, sender, args, elfed)
+	// Остальное
+	case "r":
+		fallthrough
+	case "roll":
+		b.rollCommand(channel, sender, strings.Join(args, " "), elfed)
+	}
+
+}
 
 func (b *Bot) checkPermission(username string, isMod, ownerOnly bool) bool {
 	channelName := "#" + strings.ToLower(username)
@@ -63,18 +124,18 @@ func (b *Bot) addMusicCommand(channel, username, data string, isMod, elfed bool)
 			b.ytMus.Play()
 		} else {
 			// else - nope
-			b.replyElfed(channel, username, "Ничего не включено", elfed)
+			b.replyElfed(channel, username, strSrIsOff, elfed)
 			return
 		}
 	}
 
 	if b.srOwnerOnly && !b.checkPermission(username, isMod, true) {
-		b.replyElfed(channel, username, "Не для публики", elfed)
+		b.replyElfed(channel, username, strSrIsOwnerOnly, elfed)
 		return
 	}
 
 	if !b.checkPermission(username, isMod, false) && !b.db.TryRemovePoints(username, 5) {
-		b.replyElfed(channel, username, "Не достаточно поинтов", elfed)
+		b.replyElfed(channel, username, strPointsLow, elfed)
 		return
 	}
 	msg := b.ytMus.Add(username, isMod, data)
@@ -90,16 +151,56 @@ func (b *Bot) skipMusicCommand(channel, username string, isMod, elfed bool) {
 	b.ytMus.Skip()
 }
 
-func (b *Bot) pointsCommand() {
-
+func (b *Bot) pointsCommand(channel, username string, elfed bool) {
+	count := b.db.GetPoints(username)
+	b.replyElfed(channel, username, fmt.Sprintf(strPointsFormat, count), elfed)
 }
 
-func (b *Bot) rouletteCommand() {
+func (b *Bot) rouletteCommand(channel, username string, args []string, elfed bool) {
+	if len(args) < 2 {
+		b.replyElfed(channel, username, strWrongArgs, elfed)
+		return
+	}
 
+	points := max(1, tools.NoErrConv(args[0]))
+	chance := max(2, tools.NoErrConv(args[1]))
+
+	if !b.db.TryRemovePoints(username, int(points)) {
+		b.replyElfed(channel, username, strPointsLow, elfed)
+		return
+	}
+
+	if rand.Int63n(chance) > 0 {
+		b.replyElfed(channel, username, strRouletteFail, elfed)
+		return
+	}
+
+	b.db.AddPoints(username, int(points*chance))
+	b.replyElfed(channel, username,
+		fmt.Sprintf(strRouletteSuccessFormat, points*(chance-1)),
+		elfed)
 }
 
-func (b *Bot) rollCommand() {
+func (b *Bot) rollCommand(channel, username, arg string, elfed bool) {
+	data := rollRegex.FindStringSubmatch(arg)
+	if len(data) < 3 {
+		b.replyElfed(channel, username, strWrongArgs, elfed)
+		return
+	}
 
+	count := int(max(1, min(tools.NoErrConv(data[1]), 10)))
+	size := int(max(2, tools.NoErrConv(data[2])))
+
+	sum := 0
+	rolls := make([]string, count, count)
+	for i := 0; i < count; i++ {
+		num := rand.Intn(size) + 1
+		rolls[i] = strconv.FormatInt(int64(num), 10)
+		sum += num
+	}
+	b.replyElfed(channel, username,
+		fmt.Sprintf(strRollFormat, count, size, strings.Join(rolls, " + "), sum),
+		elfed)
 }
 
 /*

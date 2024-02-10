@@ -179,24 +179,6 @@ func (b *Bot) HandleMessage(msg *tmi.Message) {
 	b.HandleCommand(channel, from, command[0], command[1:], isMod, elfed)
 }
 
-func (b *Bot) HandleCommand(channel, sender, command string, args []string, isMod, elfed bool) {
-	switch command {
-	case "sr-start":
-		b.startMusicCommand(channel, sender, strings.Join(args, " "), isMod, elfed)
-	case "sr-end":
-		fallthrough
-	case "sr-close":
-		fallthrough
-	case "sr-stop":
-		b.stopMusicCommand(channel, sender, isMod, elfed)
-	case "sr-skip":
-		b.skipMusicCommand(channel, sender, isMod, elfed)
-	case "sr":
-		b.addMusicCommand(channel, sender, strings.Join(args, " "), isMod, elfed)
-	}
-
-}
-
 func (b *Bot) setupUIs() {
 	owner := b.options.Channel[1:]
 	for _, ui := range b.uis {
