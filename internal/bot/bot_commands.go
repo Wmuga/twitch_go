@@ -65,6 +65,8 @@ func (b *Bot) HandleCommand(channel, sender, command string, args []string, isMo
 		fallthrough
 	case "roll":
 		b.rollCommand(channel, sender, strings.Join(args, " "), elfed)
+	case "help":
+		b.helpCommand(channel, sender, elfed)
 	}
 
 }
@@ -82,8 +84,8 @@ func (b *Bot) checkPermission(username string, isMod, ownerOnly bool) bool {
 	return false
 }
 
-func (b *Bot) helpCommand() {
-
+func (b *Bot) helpCommand(channel, username string, elfed bool) {
+	b.replyElfed(channel, username, strCmds, elfed)
 }
 
 func (b *Bot) soundCommand() {
