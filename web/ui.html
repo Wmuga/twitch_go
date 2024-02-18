@@ -89,13 +89,16 @@
   function init(){
     console.log('connected');
     socket.addEventListener('music',(mistr)=>{
-      let mi = JSON.parse(mistr)
+      let mi = JSON.parse(mistr.data)
       setMusic(mi?.artist,mi?.track,mi?.username);
     })
 
     socket.addEventListener('str',(str)=>{
-      addText(str);
+      addText(str.data);
     });
+    socket.onmessage = e=>{
+      console.log(e);
+    }
   }
 
   function setMusic(artist, title, requester){

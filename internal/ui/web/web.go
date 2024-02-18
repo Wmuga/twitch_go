@@ -93,6 +93,7 @@ func (web *WebUI) sendEvent(ev webEvent) {
 }
 
 func (web *WebUI) sse(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
 	// new connection id
 	id := web.last
 	web.last++
@@ -113,11 +114,12 @@ func (web *WebUI) sse(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case event := <-infoChan:
-			msg := fmt.Sprintf("%s: %s\n\n", event.Event, event.Data)
-			_, err := w.Write([]byte(msg))
+			_, err := fmt.Fprintf(w, "event:%s\ndata: %v\n\n", event.Event, event.Data)
 			if err != nil {
 				web.eLog.Println(err)
+				break
 			}
+			w.(http.Flusher).Flush()
 		}
 	}
 }
