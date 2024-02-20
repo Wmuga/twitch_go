@@ -424,5 +424,4 @@ func (yt *YTMusic) callback() {
 	yt.canPlay <- struct{}{}
 	yt.current.Store(InfoEmpty)
 	yt.curStream.Close() // nolint:errcheck
-	fmt.Println("End")
 }
