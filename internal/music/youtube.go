@@ -20,6 +20,7 @@ import (
 	"github.com/faiface/beep/mp3"
 	"github.com/faiface/beep/speaker"
 	ytdl "github.com/wader/goutubedl"
+	at "github.com/wmuga/twitch_go/internal/atomic"
 	"github.com/wmuga/twitch_go/internal/tools"
 )
 
@@ -30,9 +31,9 @@ type YTMusic struct {
 	durMod   int64
 	durOther int64
 	eLogger  *log.Logger
-	current  Info
+	current  *at.Type[Info]
 
-	queue    []Info
+	queue    *at.List[Info]
 	loopPlay atomic.Bool
 	canPlay  chan struct{}
 
@@ -83,9 +84,10 @@ func New(apiKey, owner string) IMusicPlayer {
 		durMod:   10 * 60,
 		durOther: 5 * 60,
 		eLogger:  log.New(os.Stdout, "[YT ERR] ", log.LUTC),
-		queue:    make([]Info, 0, 3),
+		queue:    at.NewList[Info](),
 		canPlay:  make(chan struct{}, 1),
 		loopPlay: atomic.Bool{},
+		current:  at.NewType[Info](),
 	}
 
 	yt.loopPlay.Store(false)
@@ -141,8 +143,8 @@ func (yt *YTMusic) Add(username string, isMod bool, search string) string {
 		isMod && info.Duration <= yt.durMod ||
 		info.Duration <= yt.durOther {
 
-		yt.queue = append(yt.queue, info)
-		return fmt.Sprintf(strAddedFormat, info.Artist, info.Track, len(yt.queue))
+		yt.queue.Push(info)
+		return fmt.Sprintf(strAddedFormat, info.Artist, info.Track, yt.queue.Count())
 	}
 
 	return strTooLong
@@ -153,10 +155,7 @@ func (*YTMusic) ChangeVolume(volume float64) {
 }
 
 func (yt *YTMusic) Current() Info {
-	if !yt.isPlaying() {
-		return InfoEmpty
-	}
-	return yt.current
+	return yt.current.Load()
 }
 
 func (yt *YTMusic) Ready() bool {
@@ -182,7 +181,7 @@ func (yt *YTMusic) Stop() {
 }
 
 func (yt *YTMusic) isPlaying() bool {
-	return yt.Ready() && yt.current != InfoEmpty
+	return yt.Ready() && yt.current.Load() != InfoEmpty
 }
 
 func (*YTMusic) getLength(lenStr string) int64 {
@@ -216,7 +215,7 @@ func (yt *YTMusic) isOwner(username string) bool {
 
 func (yt *YTMusic) countRequests(username string) int {
 	res := 0
-	for _, r := range yt.queue {
+	for _, r := range yt.queue.Elements() {
 		if strings.EqualFold(r.Username, username) {
 			res++
 		}
@@ -300,19 +299,25 @@ func (yt *YTMusic) getVideoInfo(id string) Info {
 
 func (yt *YTMusic) tryPlaying() {
 	// check queue length
-	if len(yt.queue) == 0 {
+	if yt.queue.Count() == 0 {
 		time.Sleep(time.Second * 5)
+		yt.canPlay <- struct{}{}
 		return
 	}
 	// get item from queue
-	item := yt.queue[0]
-	yt.queue = yt.queue[1:]
+	item, err := yt.queue.Shift()
+	if err != nil {
+		yt.eLogger.Println(err)
+		yt.canPlay <- struct{}{}
+		yt.current.Store(InfoEmpty)
+		return
+	}
 
 	buf, err := downloadMusic(item)
 	if err != nil {
 		yt.eLogger.Println(err)
 		yt.canPlay <- struct{}{}
-		yt.current = InfoEmpty
+		yt.current.Store(InfoEmpty)
 		return
 	}
 
@@ -320,7 +325,7 @@ func (yt *YTMusic) tryPlaying() {
 	if err != nil {
 		yt.eLogger.Println(err)
 		yt.canPlay <- struct{}{}
-		yt.current = InfoEmpty
+		yt.current.Store(InfoEmpty)
 		return
 	}
 
@@ -329,7 +334,7 @@ func (yt *YTMusic) tryPlaying() {
 	if err != nil {
 		yt.eLogger.Println(err)
 		yt.canPlay <- struct{}{}
-		yt.current = InfoEmpty
+		yt.current.Store(InfoEmpty)
 		return
 	}
 
@@ -337,13 +342,13 @@ func (yt *YTMusic) tryPlaying() {
 	if err != nil {
 		yt.eLogger.Println(err)
 		yt.canPlay <- struct{}{}
-		yt.current = InfoEmpty
+		yt.current.Store(InfoEmpty)
 		speaker.Close()
 		return
 	}
 
 	yt.curStream = stream
-	yt.current = item
+	yt.current.Store(item)
 
 	speaker.Play(beep.Seq(stream,
 		beep.Callback(yt.callback)))
@@ -417,6 +422,7 @@ func convertToMp3(buf []byte) (*bytes.Buffer, error) {
 
 func (yt *YTMusic) callback() {
 	yt.canPlay <- struct{}{}
-	yt.current = InfoEmpty
+	yt.current.Store(InfoEmpty)
 	yt.curStream.Close() // nolint:errcheck
+	fmt.Println("End")
 }
