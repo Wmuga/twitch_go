@@ -24,6 +24,8 @@ import (
 	"github.com/wmuga/twitch_go/internal/tools"
 )
 
+// Plays music from youtube.
+// Create new instance with NewYTMusic
 type YTMusic struct {
 	apiKey   string
 	owner    string
@@ -40,6 +42,7 @@ type YTMusic struct {
 	curStream beep.StreamSeekCloser
 }
 
+// Nesessary fields from yt request api
 type idResult struct {
 	Items []struct {
 		ID      string `json:"id"`
@@ -52,6 +55,8 @@ type idResult struct {
 		} `json:"contentDetails"`
 	} `json:"items"`
 }
+
+// Nesessary fields from yt request api
 type searchResult struct {
 	Items []struct {
 		ID struct {
@@ -76,7 +81,8 @@ var (
 	ytReg2 = regexp.MustCompile(`tu\.be`)
 )
 
-func New(apiKey, owner string) IMusicPlayer {
+// Creates new instance of YTMusic
+func NewYTMusic(apiKey, owner string) IMusicPlayer {
 	yt := &YTMusic{
 		apiKey:   apiKey,
 		owner:    owner,
@@ -116,6 +122,7 @@ func New(apiKey, owner string) IMusicPlayer {
 	return yt
 }
 
+// Implementation of IMusicPlayer.AddMassAddPoints
 func (yt *YTMusic) Add(username string, isMod bool, search string) string {
 	if !isMod && !yt.isOwner(username) && yt.countRequests(username) > 2 {
 		return strQueueMax
@@ -150,22 +157,27 @@ func (yt *YTMusic) Add(username string, isMod bool, search string) string {
 	return strTooLong
 }
 
+// Implementation of IMusicPlayer.ChangeVolume
 func (*YTMusic) ChangeVolume(volume float64) {
 	panic("unimplemented")
 }
 
+// Implementation of IMusicPlayer.Current
 func (yt *YTMusic) Current() Info {
 	return yt.current.Load()
 }
 
+// Implementation of IMusicPlayer.Ready
 func (yt *YTMusic) Ready() bool {
 	return yt.loopPlay.Load()
 }
 
+// Implementation of IMusicPlayer.Play
 func (yt *YTMusic) Play() {
 	yt.loopPlay.Store(true)
 }
 
+// Implementation of IMusicPlayer.Skip
 func (yt *YTMusic) Skip() {
 	if !yt.isPlaying() {
 		return
@@ -175,15 +187,18 @@ func (yt *YTMusic) Skip() {
 	yt.callback()
 }
 
+// Implementation of IMusicPlayer.Stop
 func (yt *YTMusic) Stop() {
 	yt.loopPlay.Store(false)
 	yt.Skip()
 }
 
+// Returns if music is playing
 func (yt *YTMusic) isPlaying() bool {
 	return yt.Ready() && yt.current.Load() != InfoEmpty
 }
 
+// Get length of video in seconds
 func (*YTMusic) getLength(lenStr string) int64 {
 	if len(lenStr) < 2 {
 		return 0
@@ -209,10 +224,12 @@ func (*YTMusic) getLength(lenStr string) int64 {
 	return length
 }
 
+// Returns if requester is owner
 func (yt *YTMusic) isOwner(username string) bool {
 	return strings.EqualFold(username, yt.owner)
 }
 
+// Counts requests of user
 func (yt *YTMusic) countRequests(username string) int {
 	res := 0
 	for _, r := range yt.queue.Elements() {
@@ -223,6 +240,7 @@ func (yt *YTMusic) countRequests(username string) int {
 	return res
 }
 
+// Searchs video with given data
 func (yt *YTMusic) search(username, data string) Info {
 	info := yt.requestYT(urlSearchFormat, url.QueryEscape(data), yt.apiKey)
 	if info != InfoEmpty {
@@ -231,6 +249,7 @@ func (yt *YTMusic) search(username, data string) Info {
 	return info
 }
 
+// Sends request to yt api
 func (yt *YTMusic) requestYT(reqUrl string, params ...any) Info {
 	reqUrl = fmt.Sprintf(reqUrl, params...)
 	resp, err := http.Get(reqUrl)
@@ -261,6 +280,7 @@ func (yt *YTMusic) requestYT(reqUrl string, params ...any) Info {
 	return yt.getVideoInfo(search.Items[0].ID.VideoID)
 }
 
+// Gets info from video
 func (yt *YTMusic) getVideoInfo(id string) Info {
 	reqUrl := fmt.Sprintf(urlVideoDataFormat, id, yt.apiKey)
 	resp, err := http.Get(reqUrl)
@@ -297,6 +317,7 @@ func (yt *YTMusic) getVideoInfo(id string) Info {
 	}
 }
 
+// tries to start playing video from queue
 func (yt *YTMusic) tryPlaying() {
 	// check queue length
 	if yt.queue.Count() == 0 {
@@ -312,7 +333,7 @@ func (yt *YTMusic) tryPlaying() {
 		yt.current.Store(InfoEmpty)
 		return
 	}
-
+	// download video
 	buf, err := downloadMusic(item)
 	if err != nil {
 		yt.eLogger.Println(err)
@@ -320,7 +341,7 @@ func (yt *YTMusic) tryPlaying() {
 		yt.current.Store(InfoEmpty)
 		return
 	}
-
+	// convert to mp3 format
 	resultBuffer, err := convertToMp3(buf)
 	if err != nil {
 		yt.eLogger.Println(err)
@@ -328,7 +349,7 @@ func (yt *YTMusic) tryPlaying() {
 		yt.current.Store(InfoEmpty)
 		return
 	}
-
+	// Decodes mp3
 	reader := bytes.NewReader(resultBuffer.Bytes())
 	stream, format, err := mp3.Decode(io.NopCloser(reader))
 	if err != nil {
@@ -337,7 +358,7 @@ func (yt *YTMusic) tryPlaying() {
 		yt.current.Store(InfoEmpty)
 		return
 	}
-
+	// Inits spreaker
 	err = speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
 	if err != nil {
 		yt.eLogger.Println(err)
@@ -346,7 +367,7 @@ func (yt *YTMusic) tryPlaying() {
 		speaker.Close()
 		return
 	}
-
+	// Starts playing music
 	yt.curStream = stream
 	yt.current.Store(item)
 
@@ -354,6 +375,7 @@ func (yt *YTMusic) tryPlaying() {
 		beep.Callback(yt.callback)))
 }
 
+// Downloads video from youtube
 func downloadMusic(item Info) ([]byte, error) {
 	fmt.Println("downloading")
 	res, err := ytdl.New(context.Background(), fmt.Sprintf(urlVideoFormat, item.ID), ytdl.Options{})
@@ -375,6 +397,7 @@ func downloadMusic(item Info) ([]byte, error) {
 	return buf, nil
 }
 
+// Uses video to mp3 using ffmpeg
 func convertToMp3(buf []byte) (*bytes.Buffer, error) {
 	cmd := exec.Command("ffmpeg", "-y", // Yes to all
 		"-hide_banner", "-loglevel", "panic", // Hide all logs
@@ -386,7 +409,7 @@ func convertToMp3(buf []byte) (*bytes.Buffer, error) {
 		"-f", "mp3", // using mp3 muxer (IMPORTANT, output data to pipe require manual muxer selecting)
 		"pipe:1", // output to stdout
 	)
-	resultBuffer := bytes.NewBuffer(make([]byte, 50*1024*1024))
+	resultBuffer := bytes.NewBuffer(make([]byte, 60*1024*1024))
 	// Binding 0-2 ports
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = resultBuffer
@@ -420,6 +443,7 @@ func convertToMp3(buf []byte) (*bytes.Buffer, error) {
 	return resultBuffer, nil
 }
 
+// callback for end music event
 func (yt *YTMusic) callback() {
 	yt.canPlay <- struct{}{}
 	yt.current.Store(InfoEmpty)

@@ -11,6 +11,7 @@ import (
 	"github.com/wmuga/twitch_go/internal/bot"
 )
 
+// Loads bot options from json file
 func Load() (*bot.BotOptions, error) {
 	wd, err := os.Getwd()
 	if err != nil {

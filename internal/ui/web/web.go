@@ -15,6 +15,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// WebUI for easy access to commands.
+// Create new instance with NewWebUI.
 type WebUI struct {
 	*ui.EventHandler
 	eLog        *log.Logger
@@ -29,6 +31,7 @@ type webEvent struct {
 	Data  string
 }
 
+// Creates new instace of WebUI
 func NewWebUI(port int) ui.UI {
 	ev := ui.NewHandler()
 	r := mux.NewRouter()
@@ -64,6 +67,7 @@ func NewWebUI(port int) ui.UI {
 	return web
 }
 
+// Implentation of UI.SendMusic
 func (web *WebUI) SendMusic(music music.Info) {
 	bytes, err := json.Marshal(&music)
 	if err != nil {
@@ -77,6 +81,7 @@ func (web *WebUI) SendMusic(music music.Info) {
 	})
 }
 
+// Implentation of UI.SendString
 func (web *WebUI) SendString(str string) {
 	web.sendEvent(webEvent{
 		Event: "str",
@@ -84,6 +89,7 @@ func (web *WebUI) SendString(str string) {
 	})
 }
 
+// Base function for sending events to all sse connections
 func (web *WebUI) sendEvent(ev webEvent) {
 	web.conMux.RLock()
 	for _, c := range web.connections {
@@ -92,6 +98,7 @@ func (web *WebUI) sendEvent(ev webEvent) {
 	web.conMux.RUnlock()
 }
 
+// Handler for sse connection
 func (web *WebUI) sse(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	// new connection id
@@ -124,6 +131,7 @@ func (web *WebUI) sse(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Request handler for invokation of send event
 func (web *WebUI) sendHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	ch := q.Get("chan")
@@ -131,15 +139,18 @@ func (web *WebUI) sendHandler(w http.ResponseWriter, r *http.Request) {
 	web.Invoke(ui.Send, ch, msg)
 }
 
+// Request handler for invokation of send-self event
 func (web *WebUI) sendSelfHandler(w http.ResponseWriter, r *http.Request) {
 	msg := r.URL.Query().Get("msg")
 	web.Invoke(ui.SendSelf, msg)
 }
 
+// Request handler for invokation of DBGet event
 func (web *WebUI) dbGetHandler(w http.ResponseWriter, r *http.Request) {
 	web.Invoke(ui.DBGet)
 }
 
+// Request handler for invokation of DBUpdate event
 func (web *WebUI) dbUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	usr := q.Get("usr")
@@ -147,11 +158,13 @@ func (web *WebUI) dbUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	web.Invoke(ui.DBUpdate, usr, tools.NoErrConv(pts))
 }
 
+// Request handler for invokation of Resize event
 func (web *WebUI) resizeHandler(w http.ResponseWriter, r *http.Request) {
 	big := r.URL.Query().Get("big")
 	web.Invoke(ui.Resize, big == "true")
 }
 
+// Request handler for invokation of Command event
 func (web *WebUI) commandHandler(w http.ResponseWriter, r *http.Request) {
 	cmd := r.URL.Query().Get("cmd")
 	web.Invoke(ui.Command, cmd)

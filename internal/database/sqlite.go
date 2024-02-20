@@ -12,12 +12,15 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// SQLite connection.
+// Create new instance with NewSqlite().
 type SqliteCon struct {
 	db   *sql.DB
 	errs *log.Logger
 }
 
-func New() DBConnection {
+// Creates new instance of SQLite connection
+func NewSqlite() DBConnection {
 	pwd, err := os.Getwd()
 	if err != nil {
 		panic(err)
@@ -45,6 +48,7 @@ func New() DBConnection {
 	}
 }
 
+// Implementation of DBConnection.SetPoints
 func (db *SqliteCon) SetPoints(username string, points int) {
 	username = strings.ToLower(username)
 	// can't find user
@@ -61,6 +65,7 @@ func (db *SqliteCon) SetPoints(username string, points int) {
 	}
 }
 
+// Implementation of DBConnection.AddPoints
 func (db *SqliteCon) AddPoints(username string, points int) {
 	username = strings.ToLower(username)
 	// can't find user
@@ -77,6 +82,7 @@ func (db *SqliteCon) AddPoints(username string, points int) {
 	}
 }
 
+// Implementation of DBConnection.TryRemovePoints
 func (db *SqliteCon) TryRemovePoints(username string, points int) bool {
 	username = strings.ToLower(username)
 	if db.GetPoints(username) < points {
@@ -86,6 +92,7 @@ func (db *SqliteCon) TryRemovePoints(username string, points int) bool {
 	return true
 }
 
+// Implementation of DBConnection.GetPoints
 func (db *SqliteCon) GetPoints(username string) int {
 	username = strings.ToLower(username)
 	var points int
@@ -98,6 +105,7 @@ func (db *SqliteCon) GetPoints(username string) int {
 	return points
 }
 
+// Implementation of DBConnection.GetPointsTop20
 func (db *SqliteCon) GetPointsTop20() map[string]int {
 	res := map[string]int{}
 
@@ -122,6 +130,7 @@ func (db *SqliteCon) GetPointsTop20() map[string]int {
 	return res
 }
 
+// Implementation of DBConnection.GetPointsTop5
 func (db *SqliteCon) GetPointsTop5(owner string) map[string]int {
 	owner = strings.ToLower(owner)
 
@@ -147,6 +156,7 @@ func (db *SqliteCon) GetPointsTop5(owner string) map[string]int {
 	return res
 }
 
+// Implementation of DBConnection.MassAddPoints
 func (db *SqliteCon) MassAddPoints(usernames []string, toAdd int) {
 	tx, err := db.db.BeginTx(context.Background(), nil)
 	if err != nil {
@@ -156,7 +166,7 @@ func (db *SqliteCon) MassAddPoints(usernames []string, toAdd int) {
 
 	for _, username := range usernames {
 		username = strings.ToLower(username)
-		// TODO:mb should change
+
 		if db.GetPoints(username) == -1 {
 			_, err := tx.Exec(insertPointsViewerSql, username, toAdd)
 			if err != nil {

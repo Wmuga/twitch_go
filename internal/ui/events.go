@@ -20,6 +20,8 @@ type (
 	ChatCommandEventHandler func(command string)
 )
 
+// Event handler implimentation. Invokes callbacks on events.
+// Create new instance with NewHandler.
 type EventHandler struct {
 	UI
 	sendHandler     SendEventHandler
@@ -30,10 +32,12 @@ type EventHandler struct {
 	commandHandler  ChatCommandEventHandler
 }
 
+// Creates new instance of EventHandler
 func NewHandler() *EventHandler {
 	return &EventHandler{}
 }
 
+// Implementation of UI.Invoke
 func (ev *EventHandler) Invoke(event Event, args ...any) {
 	switch event {
 	case Send:
@@ -63,26 +67,32 @@ func (ev *EventHandler) Invoke(event Event, args ...any) {
 	}
 }
 
+// Implementation of UI.OnCommand
 func (ev *EventHandler) OnCommand(callback ChatCommandEventHandler) {
 	ev.commandHandler = callback
 }
 
+// Implementation of UI.OnDBGet
 func (ev *EventHandler) OnDBGet(callback DBGetEventHandler) {
 	ev.dbGetHandler = callback
 }
 
+// Implementation of UI.OnDBUpdate
 func (ev *EventHandler) OnDBUpdate(callback DBUpdateEventHandler) {
 	ev.dbUpdateHandler = callback
 }
 
+// Implementation of UI.OnResize
 func (ev *EventHandler) OnResize(callback ResizeEventHandler) {
 	ev.resizeHandler = callback
 }
 
+// Implementation of UI.OnSend
 func (ev *EventHandler) OnSend(callback SendEventHandler) {
 	ev.sendHandler = callback
 }
 
+// Implementation of UI.OnSendSelf
 func (ev *EventHandler) OnSendSelf(callback SendSelfEventHandler) {
 	ev.sendSelfHandler = callback
 }

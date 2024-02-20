@@ -84,29 +84,44 @@
     </tr>
   </table>
 <script>
-  let socket = new EventSource("/sse")
-
+  let sse = new EventSource("/sse")
+  /**
+   * Initializes page
+  */
   function init(){
     console.log('connected');
-    socket.addEventListener('music',(mistr)=>{
+    sse.addEventListener('music',(mistr)=>{
       let mi = JSON.parse(mistr.data)
       setMusic(mi?.artist,mi?.track,mi?.username);
     })
 
-    socket.addEventListener('str',(str)=>{
+    sse.addEventListener('str',(str)=>{
       addText(str.data);
     });
-    socket.onmessage = e=>{
+    sse.onmessage = e=>{
       console.log(e);
     }
   }
 
+  /**
+   * Sets current music info
+   * @param artist {string} 
+   * @param title {string} 
+   * @param requester {string} 
+  */
   function setMusic(artist, title, requester){
     document.getElementById('artist').innerText = artist??"";
     document.getElementById('title').innerText = title??"";
     document.getElementById('requester').innerText = requester??"";
   }
 
+  /**
+   * Get arguments for event
+   * @param field1 {string} 
+   * @param field1 {string} 
+   * @param reset1 {bool} - need to reset first field
+   * @param reset2 {bool} - need to reset second field
+  */
   function getArgs(field1, field2, reset1, reset2){
     let arg0 = document.getElementById(field1)?.value??""
     let arg1 = document.getElementById(field2)?.value??""
@@ -118,14 +133,20 @@
     }
   }
 
+  /**
+   * Adds text to info column
+   * @param text {string} 
+  */
   function addText(text){
     document.getElementById('infocol').innerText += `${text}\n`
   }
 
+  // Sends top20 event
   function sendTop20(){
     fetch("/dbget",{method:"POST"})
   }
 
+  // Sends message to chat
   function sendMessage(){
     let {arg0, arg1} = getArgs('channelName','msgText',false,true);
     if (arg0?.length == 0 || arg1?.length == 0) {
@@ -137,6 +158,7 @@
     fetch(`/send?chan=${arg0}&msg=${arg1}`,{method:"POST"})
   }
 
+  // Sends DBUpdate event
   function updatePoints(){
     let {arg0, arg1} = getArgs('userName','pointsCount',true,true);
     arg1 = parseInt(arg1)
@@ -149,6 +171,7 @@
     fetch(`/dbupdate?usr=${arg0}&pts=${arg1}`,{method:"POST"})
   }
 
+  // Sends Command event
   function sendCommand(){
     let {arg0, arg1} = getArgs('cmd','cmd',true,true);
     if (arg0?.length == 0) {
@@ -162,32 +185,38 @@
     fetch(`/command?cmd=${arg0}`,{method:"POST"})
   }
 
+  // Sends Resize event
   function sendResize(){
     let {arg0, arg1} = getArgs('size','size',true,true);
     arg0 = encodeURI(arg0)
     fetch(`/resize?big=${arg0}`,{method:"POST"})
   }
 
+  // Sends !sr-start command
   function startMusic(){
     let arg0 = encodeURI("!sr-start")
     fetch(`/command?cmd=${arg0}`,{method:"POST"})
   }
 
-  function startMusicMe(){
+  // Sends !sr-start command with streamer-only mode
+  function startMusicMe(){ 
     let arg0 = encodeURI("!sr-start me")
     fetch(`/command?cmd=${arg0}`,{method:"POST"})
   }
 
+  // Sends !sr-stop command
   function stopMusic(){
     let arg0 = encodeURI("!sr-stop me")
     fetch(`/command?cmd=${arg0}`,{method:"POST"})
   }
 
+  // Sends !sr-skip command
   function skipMusic(){
     let arg0 = encodeURI("!sr-skip")
     fetch(`/command?cmd=${arg0}`,{method:"POST"})
   }
 
+  // Adds music to queue
   function sendMusic(){
     let {arg0, arg1} = getArgs('musicTitle','musicTitle',true,true);
     if (arg0?.length == 0) {

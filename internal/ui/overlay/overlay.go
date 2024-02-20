@@ -12,6 +12,7 @@ import (
 	"github.com/wmuga/twitch_go/internal/ui"
 )
 
+// OBS overlay. Create new instance with NewOverlayUI
 type overlay struct {
 	*ui.EventHandler
 	port   int
@@ -24,6 +25,7 @@ type strBody struct {
 	Str string `json:"str"`
 }
 
+// Create new instance of overlay
 func NewOverlayUI(port int) ui.UI {
 	ev := ui.NewHandler()
 	ovui := &overlay{
@@ -38,6 +40,7 @@ func NewOverlayUI(port int) ui.UI {
 	return ovui
 }
 
+// Implentation of UI.SendMusic
 func (ov *overlay) SendMusic(music music.Info) {
 	data, err := json.Marshal(&music)
 	if err != nil {
@@ -55,6 +58,7 @@ func (ov *overlay) SendMusic(music music.Info) {
 	}
 }
 
+// Implentation of UI.SendString
 func (ov *overlay) SendString(str string) {
 	data, err := json.Marshal(&strBody{str})
 	if err != nil {

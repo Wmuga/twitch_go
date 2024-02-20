@@ -1,5 +1,7 @@
 package bot
 
+// TODO: может переделать под геттеры с "middleware?" и проверки на него повесить
+
 import (
 	"fmt"
 	"math/rand"
@@ -34,8 +36,7 @@ var (
 	rollRegex = regexp.MustCompile(`(\d+) *d *(\d+)`)
 )
 
-// TODO: может переделать под геттеры с "middleware?" и проверки на него повесить
-
+// Handles command with given arguments
 func (b *Bot) HandleCommand(channel, sender, command string, args []string, isMod, elfed bool) {
 	switch command {
 	// Музыка
@@ -71,6 +72,7 @@ func (b *Bot) HandleCommand(channel, sender, command string, args []string, isMo
 
 }
 
+// Checks permission for using command
 func (b *Bot) checkPermission(username string, isMod, ownerOnly bool) bool {
 	channelName := "#" + strings.ToLower(username)
 	if b.options.Channel == channelName {
@@ -84,6 +86,7 @@ func (b *Bot) checkPermission(username string, isMod, ownerOnly bool) bool {
 	return false
 }
 
+// Gives help about commands in chat
 func (b *Bot) helpCommand(channel, username string, elfed bool) {
 	b.replyElfed(channel, username, strCmds, elfed)
 }
@@ -92,6 +95,7 @@ func (b *Bot) soundCommand() {
 
 }
 
+// Starts music requests. Arg "me|self" set requests as streamer-only
 func (b *Bot) startMusicCommand(channel, username, arg string, isMod, elfed bool) {
 	if !b.checkPermission(username, isMod, true) {
 		b.replyElfed(channel, username, strNoPermisson, elfed)
@@ -110,6 +114,7 @@ func (b *Bot) startMusicCommand(channel, username, arg string, isMod, elfed bool
 	b.sendMessageElfed(channel, strSrAll, elfed)
 }
 
+// Stops music requests
 func (b *Bot) stopMusicCommand(channel, username string, isMod, elfed bool) {
 	if !b.checkPermission(username, isMod, true) {
 		b.replyElfed(channel, username, strNoPermisson, elfed)
@@ -119,31 +124,35 @@ func (b *Bot) stopMusicCommand(channel, username string, isMod, elfed bool) {
 	b.ytMus.Stop()
 }
 
+// Add music to music request queue.
 func (b *Bot) addMusicCommand(channel, username, data string, isMod, elfed bool) {
 	if !b.ytMus.Ready() {
 		// if owner - turn on
 		if b.checkPermission(username, isMod, true) {
 			b.ytMus.Play()
+			b.srOwnerOnly = true
 		} else {
 			// else - nope
 			b.replyElfed(channel, username, strSrIsOff, elfed)
 			return
 		}
 	}
-
+	// Check for streamer-only mode
 	if b.srOwnerOnly && !b.checkPermission(username, isMod, true) {
 		b.replyElfed(channel, username, strSrIsOwnerOnly, elfed)
 		return
 	}
-
+	// Check if moderator
 	if !b.checkPermission(username, isMod, false) && !b.db.TryRemovePoints(username, 5) {
 		b.replyElfed(channel, username, strPointsLow, elfed)
 		return
 	}
+	// Try to add music to queue
 	msg := b.ytMus.Add(username, isMod, data)
 	b.replyElfed(channel, username, msg, elfed)
 }
 
+// Skips currently playing music
 func (b *Bot) skipMusicCommand(channel, username string, isMod, elfed bool) {
 	if !b.checkPermission(username, isMod, true) {
 		b.replyElfed(channel, username, strNoPermisson, elfed)
@@ -153,11 +162,13 @@ func (b *Bot) skipMusicCommand(channel, username string, isMod, elfed bool) {
 	b.ytMus.Skip()
 }
 
+// Gets points of viewer
 func (b *Bot) pointsCommand(channel, username string, elfed bool) {
 	count := b.db.GetPoints(username)
 	b.replyElfed(channel, username, fmt.Sprintf(strPointsFormat, count), elfed)
 }
 
+// "Gambling" points
 func (b *Bot) rouletteCommand(channel, username string, args []string, elfed bool) {
 	if len(args) < 2 {
 		b.replyElfed(channel, username, strWrongArgs, elfed)
@@ -183,6 +194,7 @@ func (b *Bot) rouletteCommand(channel, username string, args []string, elfed boo
 		elfed)
 }
 
+// Rolls dice. {count}d{sides}
 func (b *Bot) rollCommand(channel, username, arg string, elfed bool) {
 	data := rollRegex.FindStringSubmatch(arg)
 	if len(data) < 3 {
@@ -194,7 +206,7 @@ func (b *Bot) rollCommand(channel, username, arg string, elfed bool) {
 	size := int(max(2, tools.NoErrConv(data[2])))
 
 	sum := 0
-	rolls := make([]string, count, count)
+	rolls := make([]string, count)
 	for i := 0; i < count; i++ {
 		num := rand.Intn(size) + 1
 		rolls[i] = strconv.FormatInt(int64(num), 10)

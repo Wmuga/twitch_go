@@ -17,6 +17,8 @@ import (
 	"golang.org/x/exp/maps"
 )
 
+// Main bot struct.
+// Use NewBot to create new instance.
 type Bot struct {
 	db          database.DBConnection
 	conn        *tmi.Connection
@@ -31,6 +33,7 @@ type Bot struct {
 	uis         []ui.UI
 }
 
+// Creates new instance of Bot.
 func NewBot(opt *BotOptions, wg *sync.WaitGroup) *Bot {
 	conn := tmi.Connect(opt.Identity.Name, opt.Identity.Oauth)
 	b := &Bot{
@@ -39,9 +42,9 @@ func NewBot(opt *BotOptions, wg *sync.WaitGroup) *Bot {
 		joined:     map[string]struct{}{},
 		curViewers: map[string]struct{}{},
 		viewers:    map[string]struct{}{},
-		deelfer:    deelfer.New(),
-		db:         database.New(),
-		ytMus:      music.New(opt.Youtube.APIKey, opt.Channel[1:]),
+		deelfer:    deelfer.NewDeelfer(),
+		db:         database.NewSqlite(),
+		ytMus:      music.NewYTMusic(opt.Youtube.APIKey, opt.Channel[1:]),
 		uis:        []ui.UI{web.NewWebUI(opt.UIPort), overlay.NewOverlayUI(opt.OverlayPort)},
 	}
 	b.overlay = b.uis[1]
@@ -76,12 +79,14 @@ func NewBot(opt *BotOptions, wg *sync.WaitGroup) *Bot {
 	return b
 }
 
+// Joins twitch channel's chat
 func (b *Bot) Join(channel string) {
 	channel = checkChannel(channel)
 	b.joined[channel] = struct{}{}
 	b.conn.Join(channel)
 }
 
+// Leaves twitch channel's chat
 func (b *Bot) Part(channel string) {
 	channel = checkChannel(channel)
 	if _, ex := b.joined[channel]; !ex {
@@ -91,6 +96,7 @@ func (b *Bot) Part(channel string) {
 	delete(b.joined, channel)
 }
 
+// Send message to twitch channel's chat
 func (b *Bot) SendMessage(channel, message string) {
 	channel = checkChannel(channel)
 	if _, ex := b.joined[channel]; ex {
@@ -99,10 +105,12 @@ func (b *Bot) SendMessage(channel, message string) {
 	b.conn.Sendf("PRIVMSG %s :%s", channel, message)
 }
 
+// Replies to viewer in twitch chat
 func (b *Bot) Reply(channel, dest, message string) {
 	b.SendMessage(channel, fmt.Sprintf("@%s, %s", dest, message))
 }
 
+// Sends message to twitch channel's chat with optional "Elfed" effect
 func (b *Bot) sendMessageElfed(channel, message string, elfed bool) {
 	if elfed {
 		b.SendMessage(channel, b.deelfer.Translate(message))
@@ -111,6 +119,7 @@ func (b *Bot) sendMessageElfed(channel, message string, elfed bool) {
 	b.SendMessage(channel, message)
 }
 
+// Replies to viewer in twitch chat with optional "Elfed" effect
 func (b *Bot) replyElfed(channel, dest, message string, elfed bool) {
 	if elfed {
 		b.Reply(channel, dest, b.deelfer.Translate(message))
@@ -119,20 +128,22 @@ func (b *Bot) replyElfed(channel, dest, message string, elfed bool) {
 	b.Reply(channel, dest, message)
 }
 
+// Handles messages from joined channels
 func (b *Bot) HandleMessage(msg *tmi.Message) {
+	// skips own messages
 	if msg.From == b.options.Identity.Name {
 		return
 	}
-
+	// Skips PING messages
 	if len(msg.Params) == 0 {
 		return
 	}
-
+	// Skips non moderated channels
 	channel := msg.Params[0]
 	if channel != b.options.Channel {
 		return
 	}
-
+	// Greets new viewers
 	if msg.Command == "JOIN" {
 		b.curViewers[msg.From] = struct{}{}
 		if _, ex := b.viewers[msg.From]; ex || msg.From == channel[1:] {
@@ -145,12 +156,12 @@ func (b *Bot) HandleMessage(msg *tmi.Message) {
 		b.SendMessage(channel, hello)
 		return
 	}
-
+	// Removes leaving viewers
 	if msg.Command == "PART" {
 		delete(b.curViewers, msg.From)
 		return
 	}
-
+	// Skips other messages without '!'
 	if msg.Command != "PRIVMSG" || !strings.HasPrefix(msg.Trailing, "!") {
 		return
 	}
@@ -158,27 +169,28 @@ func (b *Bot) HandleMessage(msg *tmi.Message) {
 	msgStr := strings.Trim(msg.Trailing[1:], " ")
 	command := strings.Split(msgStr, " ")
 	elfed := false
-	// Commands in English. If Russian letter - de elf them
+	// Commands in English. If Russian letter - de "elf" them
 	if slices.Contains(deelfer.ArR, []rune(command[0])[0]) {
 		for i, comm := range command {
 			command[i] = b.deelfer.Translate(comm)
 		}
 		elfed = true
 	}
-
+	// Extract Display name
 	from := msg.From
 	if msg.Tags["display-name"] != "" {
 		from = msg.Tags["display-name"]
 	}
-
+	// Extract isMod
 	isMod := false
 	if msg.Tags["mod"] != "" {
 		isMod = msg.Tags["mod"] != "0"
 	}
-
+	// Handle command
 	b.HandleCommand(channel, from, command[0], command[1:], isMod, elfed)
 }
 
+// Set event handlers for uis
 func (b *Bot) setupUIs() {
 	owner := b.options.Channel[1:]
 	for _, ui := range b.uis {
@@ -209,6 +221,7 @@ func (b *Bot) setupUIs() {
 	}
 }
 
+// Sends music to UIs if changed
 func (b *Bot) updateSong() {
 	last := music.InfoEmpty
 	go func() {
@@ -226,6 +239,7 @@ func (b *Bot) updateSong() {
 	}()
 }
 
+// Checks if channle has '#' prefix
 func checkChannel(channel string) string {
 	if strings.HasPrefix(channel, "#") {
 		return channel
